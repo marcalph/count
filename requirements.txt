@@ -1,0 +1,6 @@
+tensorflow
+tensorflow_datasets
+pandas
+sklearn
+seaborn
+pillow

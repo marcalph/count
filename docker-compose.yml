@@ -1,0 +1,8 @@
+version: '3'
+
+services:
+  sdcnet:
+    build: .
+    volumes:
+      - .:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
