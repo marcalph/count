@@ -40,6 +40,8 @@ class Upsample_WO_Transposition(tf.keras.Model):
 
 
 class SDCnet(tf.keras.Model):
+    """SDCnet with vgg16 encoding base and bilinear upsampling of images
+    """
     def __init__(self, num_class, div_times=2):
         super(SDCnet, self).__init__()
         self.num_class = num_class
@@ -90,5 +92,35 @@ class SDCnet(tf.keras.Model):
         params
         ------
         feature_map is a dict
+        """
+        division_res = dict()
+        division_res['cls0'] = feature_map['cls0']
+        if self.div_times > 0:
+            # div45: Upsample and get weight
+            new_conv4 = self.up45(feature_map['conv5'], feature_map['conv4'])
+            new_conv4_w = self.div_decider(new_conv4)
+            new_conv4_w = tf.sigmoid(new_conv4_w)
+            new_conv4_reg = self.interval_clf(new_conv4)
+            del feature_map['conv5'], feature_map['conv4']
+            division_res['cls1'] = new_conv4_reg
+            division_res['w1'] = 1-new_conv4_w
+
+        if self.div_times > 1:
+            # div34: upsample and get weight
+            new_conv3 = self.up34(new_conv4, feature_map['conv3'])
+            new_conv3_w = self.lw_fc(new_conv3)
+            # new_conv3_w = F.sigmoid(new_conv3_w)
+            new_conv3_w = tf.sigmoid(new_conv3_w)
+            new_conv3_reg = self.fc(new_conv3)
+            del feature_map['conv3'], new_conv3, new_conv4
+            division_res['cls2'] = new_conv3_reg
+            division_res['w2'] = 1-new_conv3_w
+
+        feature_map['cls0'] = []
+        del feature_map
+        return division_res
+
+    def parse_merge(self, division_res):
+        """compute count
         """
         pass
