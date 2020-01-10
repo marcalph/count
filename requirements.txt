@@ -1,6 +1,6 @@
-tensorflow
-tensorflow_datasets
 pandas
 sklearn
 seaborn
 pillow
+tensorflow
+tensorflow_datasets

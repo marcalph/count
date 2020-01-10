@@ -1,8 +1,11 @@
-version: '3'
+version: '3.4'
 
 services:
   sdcnet:
-    build: .
+    build:
+      context: .
+
     volumes:
       - .:/app
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw # fixme x server windows version
+    network_mode: host
