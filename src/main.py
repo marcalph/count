@@ -92,6 +92,7 @@ class SDCnet(tf.keras.Model):
         params
         ------
         feature_map is a dict
+        division_res is a dict containing class results
         """
         division_res = dict()
         division_res['cls0'] = feature_map['cls0']
@@ -109,7 +110,6 @@ class SDCnet(tf.keras.Model):
             # div34: upsample and get weight
             new_conv3 = self.up34(new_conv4, feature_map['conv3'])
             new_conv3_w = self.lw_fc(new_conv3)
-            # new_conv3_w = F.sigmoid(new_conv3_w)
             new_conv3_w = tf.sigmoid(new_conv3_w)
             new_conv3_reg = self.fc(new_conv3)
             del feature_map['conv3'], new_conv3, new_conv4
@@ -124,3 +124,27 @@ class SDCnet(tf.keras.Model):
         """compute count
         """
         pass
+
+
+def label2count(div_res_cls, label_indice):
+    '''
+    # --Input:
+    # 1.div_res_cls is class label range in [0,1,2,...,C-1]
+    # 2.label_indice not include 0 but the other points, is a tensor
+    # --Output:
+    # 1.count value, the same size as div_res_cls
+    '''
+    # create interval to count value map - compute median and add min(i.e. 0) and max
+    l2c = [(a+b)/2 for a,b in (zip(label_indice[::1], label_indice[1::1]))]
+    l2c.insert(0,0)
+    l2c.append(max(label_indice))
+    print(f"l2c {l2c}")
+    
+    orig_shape = div_res_cls.shape
+    pre_counts = tf.gather(l2c, tf.reshape(div_res_cls, [-1]))
+    pre_counts = tf.reshape(pre_counts, orig_shape)
+    return pre_counts
+
+
+
+
