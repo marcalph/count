@@ -97,21 +97,19 @@ class SDCnet(tf.keras.Model):
         division_res = dict()
         division_res['cls0'] = feature_map['cls0']
         if self.div_times > 0:
-            # div45: Upsample and get weight
-            new_conv4 = self.up45(feature_map['conv5'], feature_map['conv4'])
-            new_conv4_w = self.div_decider(new_conv4)
-            new_conv4_w = tf.sigmoid(new_conv4_w)
-            new_conv4_reg = self.interval_clf(new_conv4)
+            # div45: Upsample and get weights
+            new_conv4 = self.up45(feature_map['conv5'], feature_map['conv4'])   #f1
+            new_conv4_w = self.div_decider(new_conv4)                           #w1
+            new_conv4_reg = self.interval_clf(new_conv4)                        #c1
             del feature_map['conv5'], feature_map['conv4']
             division_res['cls1'] = new_conv4_reg
             division_res['w1'] = 1-new_conv4_w
 
         if self.div_times > 1:
-            # div34: upsample and get weight
-            new_conv3 = self.up34(new_conv4, feature_map['conv3'])
-            new_conv3_w = self.lw_fc(new_conv3)
-            new_conv3_w = tf.sigmoid(new_conv3_w)
-            new_conv3_reg = self.fc(new_conv3)
+            # div34: upsample and get weights
+            new_conv3 = self.up34(new_conv4, feature_map['conv3'])              #f2
+            new_conv3_w = self.div_decider(new_conv3)                           #w2
+            new_conv3_reg = self.interval_clf(new_conv3)                        #c2
             del feature_map['conv3'], new_conv3, new_conv4
             division_res['cls2'] = new_conv3_reg
             division_res['w2'] = 1-new_conv3_w
@@ -120,30 +118,46 @@ class SDCnet(tf.keras.Model):
         del feature_map
         return division_res
 
-    def parse_merge(self, division_res):
-        """compute count
-        """
-        pass
+    def parse_merge(self, div_res):
+        res = dict() 
 
+        for cidx in range(self.div_times+1):
+            tname = 'c' + str(cidx)
+            div_res['cls'+str(cidx)] = div_res['cls'+str(cidx)].reduce_max(dim=1,keepdim=True)[1]
+            res[tname] = label2count(div_res['cls'+str(cidx)], self.label_indice)
 
-def label2count(div_res_cls, label_indice):
-    '''
-    # --Input:
-    # 1.div_res_cls is class label range in [0,1,2,...,C-1]
-    # 2.label_indice not include 0 but the other points, is a tensor
-    # --Output:
-    # 1.count value, the same size as div_res_cls
-    '''
-    # create interval to count value map - compute median and add min(i.e. 0) and max
-    l2c = [(a+b)/2 for a,b in (zip(label_indice[::1], label_indice[1::1]))]
-    l2c.insert(0,0)
-    l2c.append(max(label_indice))
-    print(f"l2c {l2c}")
-    
-    orig_shape = div_res_cls.shape
-    pre_counts = tf.gather(l2c, tf.reshape(div_res_cls, [-1]))
-    pre_counts = tf.reshape(pre_counts, orig_shape)
-    return pre_counts
+        # res['c0'] is the parse result
+        res['div0'] = res['c0']
+        for divt in range(1, self.div_times+1):
+            tname = 'div' + str(divt) 
+            tchigh = res['c' + str(divt)] 
+            tclow = res['div' + str(int(divt-1))]
+            tclow = count_merge_low2high_batch(tclow,tchigh)
+            tw = div_res['w'+str(divt)]
+            res[tname] = (1-tw)*tclow + tw*tchigh
+        
+        del div_res
+        return res   
+
+    @staticmethod
+    def label2count(div_res_cls, label_indice):
+        '''
+        # --Input:
+        # 1.div_res_cls is class label range in [0,1,2,...,C-1]
+        # 2.label_indice not include 0 but the other points, is a tensor
+        # --Output:
+        # 1.count value, the same size as div_res_cls
+        '''
+        # create interval to count value map - compute median and add min(i.e. 0) and max
+        l2c = [(a+b)/2 for a,b in (zip(label_indice[::1], label_indice[1::1]))]
+        l2c.insert(0,0)
+        l2c.append(max(label_indice))
+        print(f"l2c {l2c}")
+        
+        orig_shape = div_res_cls.shape
+        pre_counts = tf.gather(l2c, tf.reshape(div_res_cls, [-1]))
+        pre_counts = tf.reshape(pre_counts, orig_shape)
+        return pre_counts
 
 
 
