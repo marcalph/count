@@ -132,12 +132,27 @@ class SDCnet(tf.keras.Model):
             tname = 'div' + str(divt) 
             tchigh = res['c' + str(divt)] 
             tclow = res['div' + str(int(divt-1))]
-            tclow = count_merge_low2high_batch(tclow,tchigh)
+            tclow = merge_low2high_count(tclow,tchigh)
             tw = div_res['w'+str(divt)]
             res[tname] = (1-tw)*tclow + tw*tchigh
         
         del div_res
         return res   
+
+
+    @staticmethod
+    def merge_low2high_count(clow, chigh):
+        """
+        """
+        rate = int(chigh.size()[-1]/clow.size()[-1])
+        norm = 1/(float(rate)**2)
+        cl2h = torch.zeros(chigh.size())
+        for rx in range(rate):
+            for ry in range(rate):
+                cl2h[:,:,rx::rate,ry::rate] = clow*norm
+        return cl2h
+
+
 
     @staticmethod
     def label2count(div_res_cls, label_indice):
@@ -158,6 +173,22 @@ class SDCnet(tf.keras.Model):
         pre_counts = tf.gather(l2c, tf.reshape(div_res_cls, [-1]))
         pre_counts = tf.reshape(pre_counts, orig_shape)
         return pre_counts
+
+
+def merge_low2high_count(clow, chigh):
+        """
+        """
+        rate = int(chigh.shape[-1]/clow.shape[-1])
+        norm = 1/(float(rate)**2)
+        cl2h = tf.Variable(tf.zeros(chigh.shape))
+        for rx in range(rate):
+            for ry in range(rate):
+                cl2h[:,:,rx::rate,ry::rate].assign(clow*norm)
+        return cl2h
+
+if __name__ == '__main__': 
+    pass
+
 
 
 
